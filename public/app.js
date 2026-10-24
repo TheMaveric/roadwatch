@@ -1140,7 +1140,9 @@ const renderRoads = (roads) => {
   if (!filtered.length) {
     const hasRoads = roads.length > 0;
     showMapStatus(
-      hasRoads ? 'No road records match this search or condition filter.' : 'Open map layers are available, but no verified road records have been imported yet.',
+      hasRoads
+        ? 'No road records match this search or condition filter.'
+        : 'OSM roads are reference geometry, not condition ratings. Colors show verified road records and community-report hotspots; roads without either remain unrated.',
       'success'
     );
     return;
@@ -1302,6 +1304,54 @@ const addConditionReportLayer = () => {
     type: 'geojson',
     data: conditionReportFeatures,
   });
+  [
+    ['Best', '#49d17d'],
+    ['Good', '#a3e635'],
+    ['Bad', '#ffd166'],
+    ['Worse', '#ff8b45'],
+    ['Worst', '#ff5f6d'],
+  ].forEach(([ratingLabel, color]) => {
+    map.addLayer({
+      id: `condition-report-heatmap-${ratingLabel.toLowerCase()}`,
+      type: 'heatmap',
+      source: 'condition-report-data',
+      filter: ['==', ['get', 'ratingLabel'], ratingLabel],
+      paint: {
+        'heatmap-weight': [
+          'interpolate', ['linear'], ['get', 'reportCount'],
+          1, 0.6,
+          5, 1.5,
+          20, 2.5,
+        ],
+        'heatmap-intensity': [
+          'interpolate', ['linear'], ['zoom'],
+          2, 0.5,
+          8, 0.9,
+          14, 1.2,
+        ],
+        'heatmap-color': [
+          'interpolate', ['linear'], ['heatmap-density'],
+          0, 'rgba(0, 0, 0, 0)',
+          0.2, `${color}40`,
+          0.55, `${color}99`,
+          1, `${color}d9`,
+        ],
+        'heatmap-radius': [
+          'interpolate', ['linear'], ['zoom'],
+          2, 10,
+          6, 20,
+          12, 30,
+          16, 40,
+        ],
+        'heatmap-opacity': [
+          'interpolate', ['linear'], ['zoom'],
+          2, 0.5,
+          10, 0.58,
+          15, 0.42,
+        ],
+      },
+    });
+  });
   map.addLayer({
     id: 'condition-report-points',
     type: 'circle',
@@ -1310,11 +1360,11 @@ const addConditionReportLayer = () => {
       'circle-radius': ['interpolate', ['linear'], ['get', 'reportCount'], 1, 6, 10, 11],
       'circle-color': [
         'match', ['get', 'ratingLabel'],
-        'Best', '#4ade80',
+        'Best', '#49d17d',
         'Good', '#a3e635',
-        'Bad', '#facc15',
-        'Worse', '#fb923c',
-        'Worst', '#fb6474',
+        'Bad', '#ffd166',
+        'Worse', '#ff8b45',
+        'Worst', '#ff5f6d',
         '#cbd5e1',
       ],
       'circle-stroke-color': '#08131f',
@@ -1603,9 +1653,9 @@ const initializeHighwayLayer = async () => {
       'source-layer': sourceLayer,
       layout: { visibility: showHighways ? 'visible' : 'none' },
       paint: {
-        'line-color': '#43e6a0',
+        'line-color': '#6f8995',
         'line-width': ['interpolate', ['linear'], ['zoom'], 3, 0.8, 8, 2, 12, 3.2],
-        'line-opacity': 0.88,
+        'line-opacity': 0.72,
       },
     }, 'verified-road-lines');
     map.on('click', 'national-highways-lines', (event) => {
@@ -1694,8 +1744,8 @@ map.on('load', () => {
       const layer = map.getLayer(layerId);
       if (layer.type === 'line' && !layerId.includes('casing')) {
         const isLocalRoad = localRoadLayerIds.includes(layerId);
-        map.setPaintProperty(layerId, 'line-color', isLocalRoad ? '#f2b84b' : '#46d99a');
-        map.setPaintProperty(layerId, 'line-opacity', 0.82);
+        map.setPaintProperty(layerId, 'line-color', isLocalRoad ? '#aab6b9' : '#718189');
+        map.setPaintProperty(layerId, 'line-opacity', 0.72);
       }
     });
     updateCommunityRoadVisibility();
@@ -1899,9 +1949,14 @@ nhaiProjectsToggleBtn.addEventListener('click', () => {
 conditionReportsToggleBtn.addEventListener('click', () => {
   if (!map.getLayer('condition-report-points')) return;
   showConditionReports = !showConditionReports;
-  map.setLayoutProperty('condition-report-points', 'visibility', showConditionReports ? 'visible' : 'none');
+  [
+    ...['best', 'good', 'bad', 'worse', 'worst'].map((rating) => `condition-report-heatmap-${rating}`),
+    'condition-report-points',
+  ].forEach((layerId) => {
+    map.setLayoutProperty(layerId, 'visibility', showConditionReports ? 'visible' : 'none');
+  });
   conditionReportsToggleBtn.setAttribute('aria-pressed', String(showConditionReports));
-  conditionReportsToggleBtn.textContent = `Community reports · ${showConditionReports ? 'on' : 'off'}`;
+  conditionReportsToggleBtn.textContent = `Reports heatmap · ${showConditionReports ? 'on' : 'off'}`;
   conditionReportsToggleBtn.classList.toggle('active', showConditionReports);
 });
 

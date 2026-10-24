@@ -662,6 +662,32 @@ h1 span {
   color: var(--status-color);
 }
 
+.report-heatmap-legend {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #26333b;
+  color: #cbd4d8;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.report-heatmap-scale {
+  display: grid;
+  grid-template-columns: auto minmax(40px, 1fr) auto;
+  align-items: center;
+  gap: 0.45rem;
+  color: #aeb9bf;
+  font-size: 0.64rem;
+}
+
+.report-heatmap-scale i {
+  height: 7px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #49d17d, #a3e635, #ffd166, #ff8b45, #ff5f6d);
+}
+
 .admin-actions {
   gap: 0.5rem;
   margin-bottom: 1rem;
