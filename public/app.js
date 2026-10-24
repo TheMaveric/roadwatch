@@ -71,6 +71,7 @@ let showNhaiProjects = false;
 let communityRoadLayerIds = [];
 let localRoadLayerIds = [];
 let conditionReportFeatures = { type: 'FeatureCollection', features: [] };
+let conditionRoadSegmentDataKey = '';
 let nhaiProjectFeatures = { type: 'FeatureCollection', features: [] };
 let nhaiProjectRequestId = 0;
 let nhaiProjectMoveTimer = null;
@@ -176,6 +177,68 @@ const getFeatureDistance = (feature, origin) => {
     .map((line) => nearestPointOnLine(line, origin))
     .filter(Boolean)
     .sort((left, right) => left.distanceMeters - right.distanceMeters)[0] || null;
+};
+
+const clipRoadLineAtReport = (coordinates, origin, halfLengthMeters = 65) => {
+  if (!Array.isArray(coordinates) || coordinates.length < 2) return null;
+  const latitudeScale = 111_320;
+  const longitudeScale = latitudeScale * Math.cos(origin[1] * Math.PI / 180);
+  const localCoordinates = coordinates.map(([longitude, latitude]) => [
+    (longitude - origin[0]) * longitudeScale,
+    (latitude - origin[1]) * latitudeScale,
+  ]);
+  const distances = [0];
+  for (let index = 1; index < localCoordinates.length; index += 1) {
+    distances.push(distances[index - 1] + Math.hypot(
+      localCoordinates[index][0] - localCoordinates[index - 1][0],
+      localCoordinates[index][1] - localCoordinates[index - 1][1],
+    ));
+  }
+
+  let nearest = null;
+  for (let index = 1; index < localCoordinates.length; index += 1) {
+    const start = localCoordinates[index - 1];
+    const end = localCoordinates[index];
+    const segment = [end[0] - start[0], end[1] - start[1]];
+    const length = distances[index] - distances[index - 1];
+    const proportion = length === 0
+      ? 0
+      : Math.max(0, Math.min(1, -(start[0] * segment[0] + start[1] * segment[1]) / length ** 2));
+    const distanceMeters = Math.hypot(
+      start[0] + segment[0] * proportion,
+      start[1] + segment[1] * proportion,
+    );
+    if (!nearest || distanceMeters < nearest.distanceMeters) {
+      nearest = {
+        distanceMeters,
+        alongMeters: distances[index - 1] + length * proportion,
+      };
+    }
+  }
+  if (!nearest || nearest.distanceMeters > 30) return null;
+
+  const startMeters = Math.max(0, nearest.alongMeters - halfLengthMeters);
+  const endMeters = Math.min(distances[distances.length - 1], nearest.alongMeters + halfLengthMeters);
+  const coordinateAt = (distanceMeters) => {
+    const segmentIndex = distances.findIndex((distance, index) => index > 0 && distance >= distanceMeters);
+    if (segmentIndex < 0) return coordinates[coordinates.length - 1];
+    const segmentLength = distances[segmentIndex] - distances[segmentIndex - 1];
+    const proportion = segmentLength === 0
+      ? 0
+      : (distanceMeters - distances[segmentIndex - 1]) / segmentLength;
+    return [
+      coordinates[segmentIndex - 1][0]
+        + (coordinates[segmentIndex][0] - coordinates[segmentIndex - 1][0]) * proportion,
+      coordinates[segmentIndex - 1][1]
+        + (coordinates[segmentIndex][1] - coordinates[segmentIndex - 1][1]) * proportion,
+    ];
+  };
+  const clipped = [coordinateAt(startMeters)];
+  coordinates.forEach((coordinate, index) => {
+    if (distances[index] > startMeters && distances[index] < endMeters) clipped.push(coordinate);
+  });
+  clipped.push(coordinateAt(endMeters));
+  return clipped.length > 1 ? clipped : null;
 };
 
 const getNearbyMapRoads = (coordinates) => {
@@ -1142,7 +1205,7 @@ const renderRoads = (roads) => {
     showMapStatus(
       hasRoads
         ? 'No road records match this search or condition filter.'
-        : 'OSM roads are reference geometry, not condition ratings. Colors show verified road records and community-report hotspots; roads without either remain unrated.',
+        : 'OSM roads are reference geometry. Colors show verified records, community hotspots, and short road sections linked by a report’s OSM way ID; unmatched roads remain unrated.',
       'success'
     );
     return;
@@ -1260,6 +1323,73 @@ const refreshConditionReports = async () => {
   conditionReportFeatures = reports;
   const source = map.getSource('condition-report-data');
   if (source) source.setData(reports);
+  renderConditionRoadSegments();
+};
+
+const renderConditionRoadSegments = () => {
+  const source = map.getSource('condition-road-data');
+  if (!source) return;
+
+  const setSegments = (features) => {
+    const dataKey = JSON.stringify(features);
+    if (dataKey === conditionRoadSegmentDataKey) return;
+    conditionRoadSegmentDataKey = dataKey;
+    source.setData({ type: 'FeatureCollection', features });
+  };
+  const reportsByWayId = new Map();
+  conditionReportFeatures.features.forEach((report) => {
+    const wayId = report.properties?.osmWayId;
+    if (wayId === undefined || wayId === null || wayId === '') return;
+    const reports = reportsByWayId.get(String(wayId)) || [];
+    reports.push(report);
+    reportsByWayId.set(String(wayId), reports);
+  });
+  const roadLayerIds = communityRoadLayerIds.filter((layerId) => {
+    const layer = map.getLayer(layerId);
+    return layer?.type === 'line'
+      && !layerId.includes('casing')
+      && map.getLayoutProperty(layerId, 'visibility') !== 'none';
+  });
+  if (!reportsByWayId.size || !roadLayerIds.length || !showCommunityRoads) {
+    setSegments([]);
+    return;
+  }
+
+  const features = [];
+  const seenSegments = new Set();
+  map.queryRenderedFeatures({ layers: roadLayerIds }).forEach((road) => {
+    if (road.id === undefined || road.id === null) return;
+    const linkedReports = reportsByWayId.get(String(road.id));
+    if (!linkedReports) return;
+    const geometryType = road.geometry?.type;
+    const lines = geometryType === 'LineString'
+      ? [road.geometry.coordinates]
+      : geometryType === 'MultiLineString'
+        ? road.geometry.coordinates
+        : [];
+
+    linkedReports.forEach((report) => {
+      const origin = report.geometry?.coordinates;
+      if (!Array.isArray(origin) || origin.length < 2) return;
+      lines.forEach((line) => {
+        const clipped = clipRoadLineAtReport(line, origin);
+        if (!clipped) return;
+        const key = `${report.id}:${road.id}:${JSON.stringify(clipped)}`;
+        if (seenSegments.has(key)) return;
+        seenSegments.add(key);
+        features.push({
+          type: 'Feature',
+          id: key,
+          properties: {
+            reportId: String(report.id),
+            ratingLabel: report.properties.ratingLabel,
+          },
+          geometry: { type: 'LineString', coordinates: clipped },
+        });
+      });
+    });
+  });
+  setSegments(features);
 };
 
 const reportDate = (value) => new Intl.DateTimeFormat(undefined, {
@@ -1304,6 +1434,10 @@ const addConditionReportLayer = () => {
     type: 'geojson',
     data: conditionReportFeatures,
   });
+  map.addSource('condition-road-data', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
   [
     ['Best', '#49d17d'],
     ['Good', '#a3e635'],
@@ -1319,38 +1453,55 @@ const addConditionReportLayer = () => {
       paint: {
         'heatmap-weight': [
           'interpolate', ['linear'], ['get', 'reportCount'],
-          1, 0.6,
-          5, 1.5,
-          20, 2.5,
+          1, 1,
+          5, 1.8,
+          20, 2.8,
         ],
         'heatmap-intensity': [
           'interpolate', ['linear'], ['zoom'],
-          2, 0.5,
-          8, 0.9,
-          14, 1.2,
+          2, 1.6,
+          8, 2,
+          14, 2.5,
         ],
         'heatmap-color': [
           'interpolate', ['linear'], ['heatmap-density'],
           0, 'rgba(0, 0, 0, 0)',
-          0.2, `${color}40`,
-          0.55, `${color}99`,
-          1, `${color}d9`,
+          0.005, `${color}2e`,
+          0.03, `${color}59`,
+          0.15, `${color}a6`,
+          0.4, `${color}d6`,
+          1, `${color}f5`,
         ],
         'heatmap-radius': [
           'interpolate', ['linear'], ['zoom'],
-          2, 10,
-          6, 20,
-          12, 30,
-          16, 40,
+          2, 14,
+          6, 24,
+          10, 40,
+          14, 65,
+          17, 82,
+          18, 92,
         ],
-        'heatmap-opacity': [
-          'interpolate', ['linear'], ['zoom'],
-          2, 0.5,
-          10, 0.58,
-          15, 0.42,
-        ],
+        'heatmap-opacity': 0.78,
       },
     });
+  });
+  map.addLayer({
+    id: 'condition-road-segments',
+    type: 'line',
+    source: 'condition-road-data',
+    paint: {
+      'line-color': [
+        'match', ['get', 'ratingLabel'],
+        'Best', '#49d17d',
+        'Good', '#a3e635',
+        'Bad', '#ffd166',
+        'Worse', '#ff8b45',
+        'Worst', '#ff5f6d',
+        '#cbd5e1',
+      ],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 16, 6, 20, 9],
+      'line-opacity': 0.96,
+    },
   });
   map.addLayer({
     id: 'condition-report-points',
@@ -1374,6 +1525,13 @@ const addConditionReportLayer = () => {
   });
   map.on('mouseenter', 'condition-report-points', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'condition-report-points', () => { map.getCanvas().style.cursor = ''; });
+  map.on('click', 'condition-road-segments', (event) => {
+    const reportId = event.features?.[0]?.properties?.reportId;
+    const report = conditionReportFeatures.features.find((feature) => String(feature.id) === reportId);
+    if (report) showConditionReportSummary(report, event.lngLat);
+  });
+  map.on('mouseenter', 'condition-road-segments', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'condition-road-segments', () => { map.getCanvas().style.cursor = ''; });
 };
 
 const addNhaiProjectLayer = () => {
@@ -1744,8 +1902,11 @@ map.on('load', () => {
       const layer = map.getLayer(layerId);
       if (layer.type === 'line' && !layerId.includes('casing')) {
         const isLocalRoad = localRoadLayerIds.includes(layerId);
-        map.setPaintProperty(layerId, 'line-color', isLocalRoad ? '#aab6b9' : '#718189');
-        map.setPaintProperty(layerId, 'line-opacity', 0.72);
+        map.setPaintProperty(layerId, 'line-color', isLocalRoad ? '#91aeb5' : '#6f909b');
+        map.setPaintProperty(layerId, 'line-opacity', 0.9);
+      } else if (layer.type === 'line' && layerId.includes('casing')) {
+        map.setPaintProperty(layerId, 'line-color', '#617780');
+        map.setPaintProperty(layerId, 'line-opacity', 0.78);
       }
     });
     updateCommunityRoadVisibility();
@@ -1760,6 +1921,8 @@ map.on('load', () => {
   renderRoads(allRoads);
   map.on('click', (event) => {
     if (showNhaiProjects && map.queryRenderedFeatures(event.point, { layers: ['nhai-project-lines'] }).length) return;
+    if (showConditionReports
+      && map.queryRenderedFeatures(event.point, { layers: ['condition-road-segments'] }).length) return;
     const nearbyReport = showConditionReports && conditionReportFeatures.features.find((feature) => {
       const point = map.project(feature.geometry.coordinates);
       return Math.hypot(point.x - event.point.x, point.y - event.point.y) <= 20;
@@ -1768,7 +1931,12 @@ map.on('load', () => {
       showConditionReportSummary(nearbyReport, event.lngLat);
       return;
     }
-    showConditionReportForm({ properties: { class: 'road' } }, event.lngLat);
+    const roadFeature = map.queryRenderedFeatures(event.point, { layers: communityRoadLayerIds })
+      .filter((feature) => feature.sourceLayer === 'transportation'
+        && ['LineString', 'MultiLineString'].includes(feature.geometry.type)
+        && feature.id !== undefined)
+      .sort((left, right) => Number(left.layer.id.includes('casing')) - Number(right.layer.id.includes('casing')))[0];
+    showConditionReportForm(roadFeature || { properties: { class: 'road' } }, event.lngLat);
   });
   refreshConditionReports().catch((error) => {
     console.error('Community reports failed to load:', error);
@@ -1778,6 +1946,7 @@ map.on('load', () => {
     refreshConditionReports().catch((error) => console.error('Community reports refresh failed:', error));
   }, 60_000);
   map.on('moveend', () => {
+    renderConditionRoadSegments();
     if (userLocationMarker) {
       const location = userLocationMarker.getLngLat();
       scheduleNearbyRoadPopup([location.lng, location.lat]);
@@ -1786,6 +1955,7 @@ map.on('load', () => {
     window.clearTimeout(nhaiProjectMoveTimer);
     nhaiProjectMoveTimer = window.setTimeout(refreshNhaiProjects, 500);
   });
+  map.on('idle', renderConditionRoadSegments);
   initializeStateBoundaries();
   initializeHighwayLayer();
 });
@@ -1916,6 +2086,7 @@ communityRoadsToggleBtn.addEventListener('click', () => {
   if (!communityRoadLayerIds.length) return;
   showCommunityRoads = !showCommunityRoads;
   updateCommunityRoadVisibility();
+  renderConditionRoadSegments();
   communityRoadsToggleBtn.setAttribute('aria-pressed', String(showCommunityRoads));
   communityRoadsToggleBtn.textContent = `OSM roads · ${showCommunityRoads ? 'on' : 'off'}`;
   communityRoadsToggleBtn.classList.toggle('active', showCommunityRoads);
@@ -1925,6 +2096,7 @@ localRoadsToggleBtn.addEventListener('click', () => {
   if (!localRoadLayerIds.length) return;
   showLocalRoads = !showLocalRoads;
   updateCommunityRoadVisibility();
+  renderConditionRoadSegments();
   localRoadsToggleBtn.setAttribute('aria-pressed', String(showLocalRoads));
   localRoadsToggleBtn.textContent = `Local + village roads · ${showLocalRoads ? 'on' : 'off'}`;
   localRoadsToggleBtn.classList.toggle('active', showLocalRoads);
@@ -1951,6 +2123,7 @@ conditionReportsToggleBtn.addEventListener('click', () => {
   showConditionReports = !showConditionReports;
   [
     ...['best', 'good', 'bad', 'worse', 'worst'].map((rating) => `condition-report-heatmap-${rating}`),
+    'condition-road-segments',
     'condition-report-points',
   ].forEach((layerId) => {
     map.setLayoutProperty(layerId, 'visibility', showConditionReports ? 'visible' : 'none');

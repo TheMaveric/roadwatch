@@ -8,6 +8,8 @@ The map renders community-mapped OpenStreetMap roads as switchable vector layers
 
 The local road register starts empty; the previous placeholder records have been removed. Unknown values stay unknown rather than being inferred from road type or filled with sample costs, contractors, or inspection dates. The register can store verified construction cost, contract reference, contractor, road length, inspection condition, and pothole count.
 
+When a community report is submitted by selecting a rendered OSM road, its matching way ID lets the map color an approximately 130 m road segment around the report using that community rating. Reports without a reliable road match remain visible as point hotspots and do not color a road line. Segment colors represent community feedback, not an official inspection or the condition of the entire mapped road.
+
 The in-app **Sources** desk now includes these open-data leads:
 
 | Dataset | Useful for | Limitation |
