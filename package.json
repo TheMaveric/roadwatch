@@ -1,0 +1,24 @@
+{
+  "name": "road-mapper-app",
+  "version": "1.0.0",
+  "description": "Map bad roads, track contractors, repair validity, road size, and costs.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [
+    "road",
+    "mapping",
+    "contractor",
+    "dashboard"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "mongodb": "^6.9.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

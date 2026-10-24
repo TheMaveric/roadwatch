@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080d12" />
+    <title>Roadwatch India | National Road Intelligence</title>
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <div class="brand-mark">RI</div>
+          <div>
+            <p class="eyebrow">NATIONAL OPERATIONS</p>
+            <h1>Roadwatch <span>India</span></h1>
+            <p class="subtitle">A live picture of India’s road network</p>
+          </div>
+        </div>
+
+        <div class="network-status">
+          <span class="status-pulse"></span>
+          <div><strong>COMMUNITY ROAD MAP</strong><span>India · coverage varies</span></div>
+          <span class="status-live">OSM</span>
+          <span id="storageStatus" class="storage-status">CHECKING STORE</span>
+        </div>
+
+        <section class="summary-grid" aria-label="Verified road statistics">
+          <div class="summary-card">
+            <span>Verified records</span>
+            <strong id="totalRoads">0</strong>
+          </div>
+          <div class="summary-card">
+            <span>Contract value on file</span>
+            <strong id="totalCost">₹ 0</strong>
+          </div>
+          <div class="summary-card">
+            <span>Avg contract validity</span>
+            <strong id="avgValidity">0 mos</strong>
+          </div>
+          <div class="summary-card danger">
+            <span>Needs attention</span>
+            <strong id="severeRoads">0</strong>
+          </div>
+          <div class="summary-card accent">
+            <span>Km on record</span>
+            <strong id="totalRoadKm">0</strong>
+          </div>
+          <div class="summary-card accent">
+            <span>Avg cost / km</span>
+            <strong id="avgCostPerKm">₹ 0</strong>
+          </div>
+        </section>
+
+        <div class="legend-box">
+          <h3>Verified record status</h3>
+          <div class="legend-row"><span class="dot unverified"></span> Not yet verified</div>
+          <div class="legend-row"><span class="dot critical"></span> Critical</div>
+          <div class="legend-row"><span class="dot poor"></span> Poor</div>
+          <div class="legend-row"><span class="dot fair"></span> Fair</div>
+          <div class="legend-row"><span class="dot good"></span> Good</div>
+          <div class="legend-row"><span class="dot excellent"></span> Excellent</div>
+        </div>
+
+        <div class="admin-actions">
+          <button id="exportExcelBtn" class="secondary-btn" type="button" disabled>Export data</button>
+          <button id="exportPdfBtn" class="secondary-btn" type="button" disabled>Brief PDF</button>
+        </div>
+
+        <form id="adminLoginForm" class="admin-login">
+          <h2>Operator access</h2>
+          <label>
+            Username
+            <input type="text" name="username" value="admin" required />
+          </label>
+          <label>
+            Password
+            <input type="password" name="password" placeholder="Admin password" autocomplete="current-password" required />
+          </label>
+          <button type="submit">Login</button>
+          <button id="logoutBtn" class="secondary-btn hidden" type="button">Logout</button>
+        </form>
+
+        <form id="roadForm" class="road-form hidden">
+          <h2>Verified road record</h2>
+          <label>
+            Road name
+            <input type="text" name="name" placeholder="e.g. NH-48 Corridor" required />
+          </label>
+          <label>
+            Area / State
+            <input type="text" name="area" placeholder="e.g. Maharashtra" required />
+          </label>
+          <div class="two-col">
+            <label>
+              Road type
+              <select name="roadType">
+                <option>National Highway</option>
+                <option>State Highway</option>
+                <option>Expressway</option>
+                <option>Urban Ring Road</option>
+                <option>Rural Road</option>
+              </select>
+            </label>
+            <label>
+              Condition
+              <select name="condition">
+                <option selected>Unverified</option>
+                <option>Excellent</option>
+                <option>Good</option>
+                <option>Fair</option>
+                <option>Poor</option>
+                <option>Critical</option>
+              </select>
+            </label>
+          </div>
+          <div class="two-col">
+            <label>
+              Road size (km)
+              <input type="number" name="sizeKm" min="0" step="0.1" placeholder="From source record" />
+            </label>
+            <label>
+              Validity (months)
+              <input type="number" name="validityMonths" min="1" step="1" placeholder="From contract" />
+            </label>
+          </div>
+          <label>
+            Contractor <span class="optional-label">if documented</span>
+            <input type="text" name="contractor" placeholder="No verified contractor on file" />
+          </label>
+          <label>
+            Contract / construction cost (₹)
+            <input type="number" name="constructionCost" min="0" step="1000" placeholder="Enter from award record" />
+          </label>
+          <label>
+            Contract reference
+            <input type="text" name="contractId" placeholder="Tender or work order number" />
+          </label>
+          <label>
+            Evidence / source reference
+            <input type="text" name="sourceReference" placeholder="Official award, inspection report, or source URL" required />
+          </label>
+          <label>
+            Potholes observed
+            <input type="number" name="potholeCount" min="0" step="1" placeholder="Leave blank if not inspected" />
+          </label>
+          <div class="two-col">
+            <label>
+              Latitude
+              <input type="number" name="lat" step="0.0001" placeholder="Latitude" required />
+            </label>
+            <label>
+              Longitude
+              <input type="number" name="lng" step="0.0001" placeholder="Longitude" required />
+            </label>
+          </div>
+          <label>
+            Last inspection
+            <input type="date" name="lastInspection" />
+          </label>
+          <button type="submit">Save verified record</button>
+        </form>
+      </aside>
+
+      <main class="main-panel">
+        <div class="topbar">
+          <div>
+            <p class="eyebrow">INDIA / NATIONAL VIEW</p>
+            <h2>Road network <span class="heading-dot">·</span> live picture</h2>
+            <p class="topbar-note">Community-mapped roads · source-backed project records · nearby-road details where data is available.</p>
+          </div>
+          <div class="map-toolbar">
+            <div class="map-filters">
+            <label class="search-field" for="roadSearch">
+              <span class="sr-only">Search roads</span>
+              <span aria-hidden="true">⌕</span>
+              <input id="roadSearch" type="search" placeholder="Search road, district, contractor…" />
+            </label>
+            <label class="filter-row" for="conditionFilter">
+              <span class="sr-only">Filter by condition</span>
+              <select id="conditionFilter">
+                <option value="All">All conditions</option>
+                <option value="Unverified">Not verified</option>
+                <option value="Critical">Critical</option>
+                <option value="Severe">Severe</option>
+                <option value="Poor">Poor</option>
+                <option value="Moderate">Moderate</option>
+                <option value="Fair">Fair</option>
+                <option value="Good">Good</option>
+                <option value="Excellent">Excellent</option>
+              </select>
+            </label>
+            </div>
+            <div class="map-actions">
+              <button id="locateMe" class="map-action" type="button">⌖ My location</button>
+              <button id="toggleCommunityRoads" class="map-action active" type="button" aria-pressed="true">OSM roads · on</button>
+              <button id="toggleLocalRoads" class="map-action active" type="button" aria-pressed="true">Local + village roads · on</button>
+              <button id="toggleConditionReports" class="map-action active" type="button" aria-pressed="true">Community reports · on</button>
+              <button id="toggleHighways" class="map-action active" type="button" aria-pressed="true">NH layer · on</button>
+              <button id="toggleNhaiProjects" class="map-action" type="button" aria-pressed="false">NHAI projects · off</button>
+              <button id="togglePmgsyDesk" class="map-action" type="button" aria-expanded="false" aria-controls="pmgsyDesk">PMGSY road records</button>
+              <button id="toggleRegister" class="map-action" type="button" aria-expanded="false" aria-controls="dashboardGrid">Road register</button>
+              <button id="toggleSources" class="map-action" type="button" aria-expanded="false" aria-controls="sourceDesk">Sources</button>
+              <button id="toggleSidebar" class="map-action" type="button" aria-expanded="true" aria-controls="sidebar">☰ Data panel</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="map-frame">
+          <div class="map-topline">
+            <span><i></i> OSM ROADS · LOCAL / VILLAGE CLASSES · GATISHAKTI NH 2024</span>
+            <span>WGS 84 <b>·</b> INDIA <button id="zoomToIndia" type="button">⌖ India</button><button id="zoomToKarnataka" type="button">⌖ Karnataka</button></span>
+          </div>
+          <div id="map"></div>
+          <div class="map-caption">
+            <span class="caption-mark">↗</span>
+            <span><strong>Live NHAI project packages</strong><small>Turn on NHAI projects and zoom into a state. Click an orange alignment for portal cost, progress, status and dates. Click elsewhere to report road condition.</small></span>
+          </div>
+        </div>
+        <div id="mapStatus" class="map-status hidden" role="status" aria-live="polite"></div>
+
+        <section id="pmgsyDesk" class="pmgsy-desk source-desk" aria-label="PMGSY rural road records">
+          <div class="source-desk-heading">
+            <div>
+              <p class="eyebrow">OFFICIAL PMGSY / eMARG LOOKUP</p>
+              <h3>Rural road contracts &amp; maintenance</h3>
+              <p>Search live public eMARG records by state, district, block and road name. This lookup is for PMGSY roads only; it does not include all village roads.</p>
+            </div>
+            <button id="closePmgsyDesk" class="map-action" type="button">Close</button>
+          </div>
+          <p class="pmgsy-notice">These records include contractor and maintenance details where reported, but the public lookup does not provide construction award cost or road geometry. Records are not automatically matched to map lines.</p>
+          <div class="pmgsy-lookup-controls">
+            <label>State / UT<select id="pmgsyState"><option value="">Choose a state</option></select></label>
+            <label>District<select id="pmgsyDistrict" disabled><option value="">Choose a district</option></select></label>
+            <label>Block<select id="pmgsyBlock" disabled><option value="">Choose a block</option></select></label>
+            <label>PMGSY road<select id="pmgsyRoad" disabled><option value="">Choose a road</option></select></label>
+          </div>
+          <div id="pmgsyStatus" class="pmgsy-status" role="status" aria-live="polite">Open the lookup to load official states.</div>
+          <div id="pmgsyDetails" class="pmgsy-details hidden"></div>
+        </section>
+
+        <section id="dashboardGrid" class="dashboard-grid">
+          <div class="panel">
+            <p class="eyebrow">DELIVERY PARTNERS</p>
+            <h3>Contractor records</h3>
+            <div id="contractorList" class="contractor-list"></div>
+          </div>
+          <div class="panel wide-panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">ROAD REGISTER</p><h3>Verified road records</h3></div>
+              <span class="table-count" id="tableCount">0 records</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Road</th>
+                    <th>District / state</th>
+                    <th>Condition</th>
+                    <th>Contractor</th>
+                    <th>Contract ref.</th>
+                    <th>Size</th>
+                    <th>Built for</th>
+                    <th>Potholes</th>
+                    <th>Inspected</th>
+                    <th>Source</th>
+                  </tr>
+                </thead>
+                <tbody id="roadTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+        <section id="sourceDesk" class="source-desk" aria-label="Open road data sources">
+          <div class="source-desk-heading">
+            <div>
+              <p class="eyebrow">INDIA / OPEN DATA SOURCE DESK</p>
+              <h3>Road data &amp; agency leads</h3>
+              <p>Geometry and aggregate road lengths are different from verified road-level contract or inspection records.</p>
+            </div>
+            <button id="closeSources" class="map-action" type="button">Close</button>
+          </div>
+          <div id="sourceList" class="source-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pmtiles@4.3.0/dist/pmtiles.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
