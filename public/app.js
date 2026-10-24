@@ -1593,7 +1593,6 @@ const initializeHighwayLayer = async () => {
     map.addSource('national-highways', {
       type: 'vector',
       url: `pmtiles://${highwayArchiveUrl}`,
-      attribution: 'Source: <a href="https://ugi.pmgatishakti.gov.in/">GatiShakti</a> · <a href="https://bharatlas.com/view/gs_highways">bharatlas</a> · CC0-1.0',
       minzoom: header.minZoom,
       maxzoom: header.maxZoom,
     });
@@ -1648,7 +1647,6 @@ const initializeStateBoundaries = async () => {
     map.addSource('lgd-state-boundaries', {
       type: 'vector',
       url: `pmtiles://${stateBoundariesArchiveUrl}`,
-      attribution: 'Boundary reference: <a href="https://lgdirectory.gov.in/">LGD</a> · <a href="https://bharatlas.com/">bharatlas</a>',
       minzoom: header.minZoom,
       maxzoom: header.maxZoom,
     });
