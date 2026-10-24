@@ -622,6 +622,7 @@ h1 span {
   margin: 0.45rem 0;
   color: #929fa7;
   font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .dot {
@@ -630,12 +631,36 @@ h1 span {
   box-shadow: 0 0 8px currentColor;
 }
 
-.dot.unverified { background: #8a98a8; color: #8a98a8; }
-.dot.critical { background: #fb6474; color: #fb6474; }
-.dot.poor { background: #fb923c; color: #fb923c; }
-.dot.fair { background: #f4c95d; color: #f4c95d; }
-.dot.good { background: #4ade80; color: #4ade80; }
-.dot.excellent { background: #57a6ff; color: #57a6ff; }
+.dot.unverified,
+.legend-row.status-unverified { --status-color: #a5b0bd; }
+.dot.critical,
+.legend-row.status-critical { --status-color: #ff5f6d; }
+.dot.poor,
+.legend-row.status-poor { --status-color: #ff8b45; }
+.dot.fair,
+.legend-row.status-fair { --status-color: #ffd166; }
+.dot.good,
+.legend-row.status-good { --status-color: #49d17d; }
+.dot.excellent,
+.legend-row.status-excellent { --status-color: #66b7ff; }
+
+.dot {
+  flex: 0 0 9px;
+}
+
+.dot.unverified,
+.dot.critical,
+.dot.poor,
+.dot.fair,
+.dot.good,
+.dot.excellent {
+  background: var(--status-color);
+  color: var(--status-color);
+}
+
+.legend-row[class*="status-"] {
+  color: var(--status-color);
+}
 
 .admin-actions {
   gap: 0.5rem;
@@ -1208,12 +1233,12 @@ tbody tr:hover {
   font-size: 0.62rem;
 }
 
-.badge.unverified { border-color: #38434c; background: #202832; color: #b2bdc7; }
-.badge.critical, .badge.severe { border-color: #59323b; background: #2a1b21; color: #ff8590; }
-.badge.poor, .badge.moderate { border-color: #57402b; background: #2b2118; color: #ffb36f; }
-.badge.fair { border-color: #554b2d; background: #292619; color: #f3d574; }
-.badge.good { border-color: #27523b; background: #15271e; color: #77e29b; }
-.badge.excellent { border-color: #294c64; background: #15232d; color: #7dc2ff; }
+.badge.unverified { border-color: #46515d; background: #202832; color: #a5b0bd; }
+.badge.critical, .badge.severe { border-color: #71313b; background: #2a1b21; color: #ff5f6d; }
+.badge.poor, .badge.moderate { border-color: #704523; background: #2b2118; color: #ff8b45; }
+.badge.fair { border-color: #68582b; background: #292619; color: #ffd166; }
+.badge.good { border-color: #27523b; background: #15271e; color: #49d17d; }
+.badge.excellent { border-color: #294c64; background: #15232d; color: #66b7ff; }
 
 .sr-only {
   position: absolute;
