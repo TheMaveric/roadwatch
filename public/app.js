@@ -54,7 +54,7 @@ const map = new maplibregl.Map({
   fitBoundsOptions: { padding: 26 },
   minZoom: 2,
   maxZoom: 18,
-  attributionControl: true,
+  attributionControl: { compact: true },
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 
@@ -671,7 +671,11 @@ const renderNearbyRoadPopup = (coordinates) => {
   content.appendChild(sourceNote);
 
   if (nearbyRoadPopup) nearbyRoadPopup.remove();
-  nearbyRoadPopup = new maplibregl.Popup({ maxWidth: '390px', closeOnMove: false })
+  nearbyRoadPopup = new maplibregl.Popup({
+    maxWidth: '390px',
+    closeOnMove: false,
+    anchor: mobileLayoutQuery.matches ? 'bottom' : undefined,
+  })
     .setLngLat(coordinates)
     .setDOMContent(content)
     .addTo(map);
@@ -1816,6 +1820,9 @@ locateMeBtn.addEventListener('click', () => {
       center: [longitude, latitude],
       zoom: nearbyZoom,
       duration: 1000,
+      padding: mobileLayoutQuery.matches
+        ? { top: Math.round(map.getContainer().clientHeight * 0.34), right: 0, bottom: 0, left: 0 }
+        : 0,
     });
     if (!showNhaiProjects) {
       nearbyNhaiDataStatus = 'loading';

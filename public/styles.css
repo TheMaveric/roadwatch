@@ -2018,6 +2018,11 @@ body {
 }
 
 @media (max-width: 1100px) {
+  .nearby-roads-popup {
+    width: min(350px, calc(100vw - 42px));
+    max-height: min(40vh, 380px);
+  }
+
   .topbar > div:first-child {
     display: none;
   }
