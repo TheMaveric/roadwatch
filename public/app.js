@@ -19,6 +19,8 @@ const zoomToIndiaBtn = document.getElementById('zoomToIndia');
 const zoomToKarnatakaBtn = document.getElementById('zoomToKarnataka');
 const locateMeBtn = document.getElementById('locateMe');
 const sidebarToggleBtn = document.getElementById('toggleSidebar');
+const mobileSidebarToggleBtn = document.getElementById('mobileSidebarToggle');
+const sidebarToggleButtons = [sidebarToggleBtn, mobileSidebarToggleBtn];
 const registerToggleBtn = document.getElementById('toggleRegister');
 const dashboardGridEl = document.getElementById('dashboardGrid');
 const sourceToggleBtn = document.getElementById('toggleSources');
@@ -82,12 +84,16 @@ const nearbyRoadSearchRadiusMeters = 1000;
 const mobileLayoutQuery = window.matchMedia('(max-width: 1100px)');
 if (mobileLayoutQuery.matches) {
   document.body.classList.add('sidebar-closed');
-  sidebarToggleBtn.setAttribute('aria-expanded', 'false');
 }
+sidebarToggleButtons.forEach((button) => {
+  button.setAttribute('aria-expanded', String(!document.body.classList.contains('sidebar-closed')));
+});
 if (mobileLayoutQuery.addEventListener) {
   mobileLayoutQuery.addEventListener('change', (event) => {
     document.body.classList.toggle('sidebar-closed', event.matches);
-    sidebarToggleBtn.setAttribute('aria-expanded', String(!event.matches));
+    sidebarToggleButtons.forEach((button) => {
+      button.setAttribute('aria-expanded', String(!event.matches));
+    });
     map.resize();
   });
 }
@@ -1901,11 +1907,14 @@ conditionReportsToggleBtn.addEventListener('click', () => {
   conditionReportsToggleBtn.classList.toggle('active', showConditionReports);
 });
 
-sidebarToggleBtn.addEventListener('click', () => {
+const toggleSidebar = () => {
   const isClosed = document.body.classList.toggle('sidebar-closed');
-  sidebarToggleBtn.setAttribute('aria-expanded', String(!isClosed));
+  sidebarToggleButtons.forEach((button) => {
+    button.setAttribute('aria-expanded', String(!isClosed));
+  });
   map.resize();
-});
+};
+sidebarToggleButtons.forEach((button) => button.addEventListener('click', toggleSidebar));
 
 registerToggleBtn.addEventListener('click', () => {
   sourceDeskEl.classList.remove('source-open');
