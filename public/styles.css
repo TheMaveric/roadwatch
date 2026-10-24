@@ -1410,7 +1410,7 @@ body {
 .map-topline {
   top: auto;
   right: 1rem;
-  bottom: 1rem;
+  bottom: 8rem;
   left: auto;
   padding: 0.55rem 0.7rem;
   border: 1px solid rgba(174, 205, 196, 0.15);
@@ -1537,7 +1537,7 @@ body {
 .map-status {
   position: fixed;
   z-index: 900;
-  top: 120px;
+  top: 132px;
   right: 18px;
   left: 316px;
   margin: 0;
@@ -2147,7 +2147,7 @@ body {
 
   .map-status,
   .sidebar-closed .map-status {
-    top: 100px;
+    top: 120px;
   }
 }
 
